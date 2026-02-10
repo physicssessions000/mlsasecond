@@ -214,6 +214,7 @@ p {
     transform: translateY(20px);
     position: relative;
     overflow: hidden;
+    will-change: transform;
 }
 
 /* Holographic Border Effect */

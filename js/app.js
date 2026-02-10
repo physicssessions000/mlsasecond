@@ -92,7 +92,7 @@ function initProgressTracker() {
     const topFillEl = document.getElementById('top-progress-fill');
     const percentEl = document.getElementById('progress-percent');
     const resetBtn = document.getElementById('reset-btn');
-    const startBtn = document.getElementById('start-session-btn');
+
 
     function updateUI() {
         const count = clickedIds.length;
@@ -210,74 +210,14 @@ function initProgressTracker() {
                 }
                 clickedIds = [];
                 activeClosingIds.clear();
-                if (startBtn) {
-                    startBtn.classList.remove('running');
-                    startBtn.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
-                        <span>START SESSION</span>
-                    `;
-                }
+
                 sessionStorage.removeItem('celebrated_current_session');
                 updateUI();
             }
         });
     }
 
-    if (startBtn) {
-        startBtn.addEventListener('click', () => {
-            if (startBtn.classList.contains('running')) return;
-            if (!confirm("Start automated session? Tabs will open and close automatically.")) return;
 
-            startBtn.classList.add('running');
-            const originalText = startBtn.innerHTML;
-            startBtn.innerHTML = '<span>SESSION STARTED</span>';
-
-            const links = Array.from(document.querySelectorAll('.link-item'));
-            const unvisitedLinks = links.filter(link => {
-                const id = link.getAttribute('data-track-id');
-                return !clickedIds.includes(id);
-            });
-
-            if (unvisitedLinks.length === 0) {
-                alert("All links already visited!");
-                startBtn.classList.remove('running');
-                startBtn.innerHTML = originalText;
-                return;
-            }
-
-            let index = 0;
-            let nextActionTime = Date.now();
-            const PACE = 2500; // Slower pace to prevent popup blocking (2.5s)
-
-            sessionHeartbeat = setInterval(() => {
-                const now = Date.now();
-                if (now < nextActionTime) return;
-
-                if (index >= unvisitedLinks.length) {
-                    clearInterval(sessionHeartbeat);
-                    startBtn.classList.remove('running');
-                    startBtn.innerHTML = '<span>SESSION ENDED</span>';
-                    setTimeout(() => startBtn.innerHTML = originalText, 3000);
-                    return;
-                }
-
-                const link = unvisitedLinks[index];
-                link.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                link.style.boxShadow = '0 0 20px #0078d4';
-
-                setTimeout(() => {
-                    link.click();
-                    link.style.boxShadow = '';
-                }, 200);
-
-                index++;
-                nextActionTime = now + PACE;
-            }, 500);
-        });
-    }
 
     updateUI();
 }
@@ -309,25 +249,41 @@ document.addEventListener('DOMContentLoaded', () => {
     // Mouse positioning for card glow effects & 3D Tilt
     const grid = document.getElementById('categories-grid');
     if (grid) {
+        let isThrottled = false;
+
         grid.onmousemove = e => {
-            for (const card of document.getElementsByClassName('card')) {
-                const rect = card.getBoundingClientRect(),
-                    x = e.clientX - rect.left,
-                    y = e.clientY - rect.top;
+            if (isThrottled) return;
+            isThrottled = true;
+            setTimeout(() => isThrottled = false, 50); // Throttle to ~20fps
 
-                // Set CSS variables for spotlight
-                card.style.setProperty('--mouse-x', `${x}px`);
-                card.style.setProperty('--mouse-y', `${y}px`);
+            // Disable 3D tilt on mobile/tablets for performance
+            if (window.innerWidth <= 768) return;
 
-                // 3D Tilt Calculation
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                const MAX_ROTATION = 10;
-                const rotateX = ((y - centerY) / centerY) * -MAX_ROTATION;
-                const rotateY = ((x - centerX) / centerX) * MAX_ROTATION;
+            // Use requestAnimationFrame for smoother visual updates
+            requestAnimationFrame(() => {
+                for (const card of document.getElementsByClassName('card')) {
+                    const rect = card.getBoundingClientRect();
+                    // Check if mouse is near this card to avoid unnecessary calcs for all cards
+                    // Simple check: is mouse within a reasonable distance? 
+                    // For now, let's keep it simple but throttled.
 
-                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
-            }
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    // Set CSS variables for spotlight
+                    card.style.setProperty('--mouse-x', `${x}px`);
+                    card.style.setProperty('--mouse-y', `${y}px`);
+
+                    // 3D Tilt Calculation
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const MAX_ROTATION = 5; // Reduced rotation for subtlety and performance
+                    const rotateX = ((y - centerY) / centerY) * -MAX_ROTATION;
+                    const rotateY = ((x - centerX) / centerX) * MAX_ROTATION;
+
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.01)`;
+                }
+            });
         };
 
         grid.onmouseleave = () => {
